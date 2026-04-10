@@ -1,7 +1,8 @@
---[[ XEURIN PRO | SILENT BOOTSTRAPPER v5.0
+--[[ XEURIN PRO | SILENT BOOTSTRAPPER v5.1
      Triple-mirror, validated, resilient bootstrap loader.
      Users execute this file — it fetches the protected engine.
      Anti-tamper: rejects payloads that fail signature or size checks.
+     FIX BUG 6: récursion → boucle while (0 stack overflow risk)
 --]]
 
 -- ── Configuration ────────────────────────────────────────────────────────────
@@ -57,49 +58,48 @@ local function backoff(attempt)
 end
 
 -- ── Boot ──────────────────────────────────────────────────────────────────────
-local function boot(attempt)
-    attempt = attempt or 1
-    if attempt > MAX_RETRIES then
-        warn("[XEURIN] All " .. #MIRRORS .. " mirrors failed after " .. MAX_RETRIES .. " attempts.")
-        warn("[XEURIN] Check your internet connection or contact support: dsc.gg/xeurin")
-        return
+-- FIX BUG 6: boucle itérative au lieu de récursion — zéro risque de stack overflow
+local function boot()
+    local attempt = 1
+    while attempt <= MAX_RETRIES do
+        local mirror = getMirror(attempt)
+
+        local ok, payload = pcall(function()
+            return game:HttpGetAsync(mirror)
+        end)
+
+        if not ok then
+            -- Erreur réseau → backoff et retry
+            task.wait(backoff(attempt))
+            attempt = attempt + 1
+            continue
+        end
+
+        local valid, reason = isValidPayload(payload)
+        if not valid then
+            -- Payload invalide → backoff et retry
+            task.wait(backoff(attempt))
+            attempt = attempt + 1
+            continue
+        end
+
+        -- Payload valid — tenter l'exécution
+        local fn, parseErr = loadstring(payload)
+        if not fn then
+            -- Erreur de parse = payload corrompu, mirror suivant immédiatement
+            task.wait(BASE_DELAY)
+            attempt = attempt + 1
+            continue
+        end
+
+        -- Succès — lancer le moteur
+        task.spawn(fn)
+        return -- sortir de la boucle
     end
 
-    local mirror = getMirror(attempt)
-    local mirrorIdx = ((attempt - 1) % #MIRRORS) + 1
-
-    local ok, payload = pcall(function()
-        return game:HttpGetAsync(mirror)
-    end)
-
-    if not ok then
-        -- Network error
-        local delay = backoff(attempt)
-        task.wait(delay)
-        boot(attempt + 1)
-        return
-    end
-
-    local valid, reason = isValidPayload(payload)
-    if not valid then
-        -- Payload validation failed
-        local delay = backoff(attempt)
-        task.wait(delay)
-        boot(attempt + 1)
-        return
-    end
-
-    -- Payload valid — attempt execution
-    local fn, parseErr = loadstring(payload)
-    if not fn then
-        -- Parse error = corrupted payload, try next mirror immediately
-        task.wait(BASE_DELAY)
-        boot(attempt + 1)
-        return
-    end
-
-    -- Success — launch engine
-    task.spawn(fn)
+    -- Tous les mirrors ont échoué
+    warn("[XEURIN] All " .. #MIRRORS .. " mirrors failed after " .. MAX_RETRIES .. " attempts.")
+    warn("[XEURIN] Check your internet connection or contact support: dsc.gg/xeurin")
 end
 
 task.spawn(boot)
