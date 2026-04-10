@@ -8,31 +8,13 @@
 -- ── Configuration ────────────────────────────────────────────────────────────
 local MIRRORS = {
     -- Primary: GitHub raw
-    (function()
-        local p = {
-            "https://raw.git","husercontent",".com/",
-            "Owner19741/Xeurin/refs/heads/main/main/XeurinObf.lua"
-        }
-        return table.concat(p)
-    end)(),
+    "https://raw.githubusercontent.com/Owner19741/Xeurin/refs/heads/main/Xeurin_Obfuscated.lua",
 
-    -- Fallback 1: jsDelivr CDN (global edge cache)
-    (function()
-        local p = {
-            "https://cdn.jsdelivr.net/gh/",
-            "Owner19741/Xeurin@main/main/XeurinObf.lua"
-        }
-        return table.concat(p)
-    end)(),
+    -- Fallback 1: jsDelivr CDN (global edge cache, ~1min delay after push)
+    "https://cdn.jsdelivr.net/gh/Owner19741/Xeurin@main/Xeurin_Obfuscated.lua",
 
-    -- Fallback 2: GitLab raw (independent CDN)
-    (function()
-        local p = {
-            "https://gitlab.com/xeurin-dist/",
-            "main/-/raw/main/XeurinObf.lua"
-        }
-        return table.concat(p)
-    end)(),
+    -- Fallback 2: statically.io CDN
+    "https://cdn.statically.io/gh/Owner19741/Xeurin/main/Xeurin_Obfuscated.lua",
 }
 
 local MAX_RETRIES    = 9        -- Total attempts across all mirrors
@@ -63,38 +45,38 @@ local function boot()
     local attempt = 1
     while attempt <= MAX_RETRIES do
         local mirror = getMirror(attempt)
+        local failed = false
 
         local ok, payload = pcall(function()
             return game:HttpGetAsync(mirror)
         end)
 
         if not ok then
-            -- Erreur réseau → backoff et retry
             task.wait(backoff(attempt))
             attempt = attempt + 1
-            continue
+            failed = true
         end
 
-        local valid, reason = isValidPayload(payload)
-        if not valid then
-            -- Payload invalide → backoff et retry
-            task.wait(backoff(attempt))
-            attempt = attempt + 1
-            continue
+        if not failed then
+            local valid, reason = isValidPayload(payload)
+            if not valid then
+                task.wait(backoff(attempt))
+                attempt = attempt + 1
+                failed = true
+            end
         end
 
-        -- Payload valid — tenter l'exécution
-        local fn, parseErr = loadstring(payload)
-        if not fn then
-            -- Erreur de parse = payload corrompu, mirror suivant immédiatement
-            task.wait(BASE_DELAY)
-            attempt = attempt + 1
-            continue
+        if not failed then
+            local fn, parseErr = loadstring(payload)
+            if not fn then
+                task.wait(BASE_DELAY)
+                attempt = attempt + 1
+                failed = true
+            else
+                task.spawn(fn)
+                return
+            end
         end
-
-        -- Succès — lancer le moteur
-        task.spawn(fn)
-        return -- sortir de la boucle
     end
 
     -- Tous les mirrors ont échoué
