@@ -8,13 +8,13 @@
 -- ── Configuration ────────────────────────────────────────────────────────────
 local MIRRORS = {
     -- Primary: GitHub raw
-    "https://raw.githubusercontent.com/Owner19741/Xeurin/refs/heads/main/Xeurin_Obfuscated.lua",
+    "https://raw.githubusercontent.com/Owner19741/Xeurin/refs/heads/main/main/XeurinObf.lua",
 
     -- Fallback 1: jsDelivr CDN (global edge cache, ~1min delay after push)
-    "https://cdn.jsdelivr.net/gh/Owner19741/Xeurin@main/Xeurin_Obfuscated.lua",
+    "https://cdn.jsdelivr.net/gh/Owner19741/Xeurin@main/main/XeurinObf.lua",
 
     -- Fallback 2: statically.io CDN
-    "https://cdn.statically.io/gh/Owner19741/Xeurin/main/Xeurin_Obfuscated.lua",
+    "https://cdn.statically.io/gh/Owner19741/Xeurin/main/main/XeurinObf.lua",
 }
 
 local MAX_RETRIES    = 9        -- Total attempts across all mirrors
