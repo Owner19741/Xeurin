@@ -6,16 +6,21 @@
 --]]
 
 -- ── Configuration ────────────────────────────────────────────────────────────
-local MIRRORS = {
-    -- Primary: GitHub raw
-    "https://raw.githubusercontent.com/Owner19741/Xeurin/refs/heads/main/main/XeurinObf.lua",
-
-    -- Fallback 1: jsDelivr CDN (global edge cache, ~1min delay after push)
-    "https://cdn.jsdelivr.net/gh/Owner19741/Xeurin@main/main/XeurinObf.lua",
-
-    -- Fallback 2: statically.io CDN
-    "https://cdn.statically.io/gh/Owner19741/Xeurin/main/main/XeurinObf.lua",
-}
+local MIRRORS = (function()
+    -- Byte-escaped to prevent grepping for repo owner / path
+    local h = "\104\116\116\112\115\58\47\47"   -- https://
+    local g = "raw.git\104\117\98\117\115\101\114\99\111\110\116\101\110\116"  -- raw.githubusercontent
+    local r = ".com/\79\119\110\101\114\49\57\55\52\49/Xeurin/refs/heads/main/main/XeurinObf.lua"
+    local j = "\104\116\116\112\115\58\47\47cdn.jsdelivr.net/gh/"
+    local j2 = "\79\119\110\101\114\49\57\55\52\49/Xeurin@main/main/XeurinObf.lua"
+    local s = "\104\116\116\112\115\58\47\47cdn.statically.io/gh/"
+    local s2 = "\79\119\110\101\114\49\57\55\52\49/Xeurin/main/main/XeurinObf.lua"
+    return {
+        h .. g .. r,      -- Primary: GitHub raw
+        j .. j2,          -- Fallback 1: jsDelivr CDN
+        s .. s2,          -- Fallback 2: statically.io CDN
+    }
+end)()
 
 local MAX_RETRIES    = 9        -- Total attempts across all mirrors
 local BASE_DELAY     = 1.0      -- Base backoff seconds
@@ -48,7 +53,8 @@ local function boot()
         local failed = false
 
         local ok, payload = pcall(function()
-            return game:HttpGetAsync(mirror)
+            if game.HttpGetAsync then return game:HttpGetAsync(mirror) end
+            return game:HttpGet(mirror)
         end)
 
         if not ok then
